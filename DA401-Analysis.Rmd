@@ -1,0 +1,203 @@
+---
+title: "DA401-Analysis"
+author: "Brandon Novak"
+date: "11/1/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+setwd("~/Desktop/DA401")
+library(dplyr)
+
+Unc_RF <- read.csv("Unc_RF.csv")
+Unc_RF <- Unc_RF %>%
+  mutate(Sampling = "Uncertainty",
+         Algorithm = "Random Forest") %>%
+  rename(iteration = X)
+
+Ent_RF <- read.csv("Ent_RF.csv")
+Ent_RF <- Ent_RF %>%
+  mutate(Sampling = "Entropy",
+         Algorithm = "Random Forest") %>%
+  rename(iteration = X)
+
+Unc_KNN <- read.csv("Unc_KNN.csv")
+Unc_KNN <- Unc_KNN %>%
+  mutate(Sampling = "Uncertainty",
+         Algorithm = "KNN") %>%
+  rename(iteration = X)
+
+Ent_KNN <- read.csv("Ent_KNN.csv")
+Ent_KNN <- Ent_KNN %>%
+  mutate(Sampling = "Entropy",
+         Algorithm = "KNN") %>%
+  rename(iteration = X)
+
+Unc_SVM <- read.csv("Unc_SVM.csv")
+Unc_SVM <- Unc_SVM %>%
+  mutate(Sampling = "Uncertainty",
+         Algorithm = "SVM") %>%
+  rename(iteration = X)
+
+Ent_SVM <- read.csv("Ent_SVM.csv")
+Ent_SVM <- Ent_SVM %>%
+  mutate(Sampling = "Entropy",
+         Algorithm = "SVM") %>%
+  rename(iteration = X)
+
+total <- rbind(Unc_RF, Unc_KNN, Unc_SVM, Ent_RF, Ent_KNN, Ent_SVM)
+
+RF_total <- rbind(Unc_RF, Ent_RF)
+KNN_total <- rbind(Unc_KNN, Ent_KNN)
+SVM_total <- rbind(Unc_SVM, Ent_SVM)
+
+Unc_total <- rbind(Unc_RF, Unc_KNN, Unc_SVM)
+Ent_total <- rbind(Ent_RF, Ent_KNN, Ent_SVM)
+```
+
+
+```{r}
+library(ggplot2)
+library(ggthemes)
+
+ggplot(total, aes(Percentage, Time, group=Algorithm, color = Algorithm))+
+  geom_line(aes(linetype=Algorithm)) +
+  ggtitle("Algorithms' Performance") +
+  xlab("Percentage of Data Labelled") +
+  ylab("Time (Sec)") +
+ # scale_x_continuous(breaks = c(.1, .2, .3, .4, .5, .6)) +
+  theme_stata()
+
+ggplot(Ent_total, aes(Percentage, Accuracy, group=Algorithm, color = Algorithm))+
+  geom_line(aes(linetype=Algorithm)) +
+  ggtitle("Algorithms' Performance using Entropy Sampling") +
+  xlab("Percentage of Data Labelled") +
+  scale_x_continuous(breaks = c(.1, .2, .3, .4, .5, .6)) +
+  theme_stata()
+
+```
+
+```{r}
+ggplot(RF_total, aes(Percentage, Accuracy, group=Sampling, color = Sampling))+
+  geom_line(aes(linetype=Sampling)) +
+  ggtitle("Random Forest's Performance By Sampling Method") +
+  xlab("Percentage of Data Labelled") +
+  scale_x_continuous(breaks = c(.1, .2, .3, .4, .5, .6)) +
+  theme_stata()
+
+ggplot(RF_total, aes(Percentage, Time, group=Sampling, color = Sampling))+
+  geom_line(aes(linetype=Sampling)) +
+  ggtitle("Random Forest's Performance By Sampling Method") +
+  xlab("Percentage of Data Labelled") +
+  ylab("Time (Sec)") +
+  theme_stata()
+
+```
+
+```{r}
+ggplot(Unc_total, aes(Percentage, Time, group=Algorithm, color = Algorithm))+
+  geom_line(aes(linetype=Algorithm)) +
+  ggtitle("Algorithms' Time Completion using Uncertainty Sampling") +
+  xlab("Percentage of Data Labelled") +
+  ylab("Time (sec)") +
+  scale_x_continuous(breaks = c(.1, .2, .3, .4, .5, .6)) +
+  theme_stata()
+
+ggplot(Ent_total, aes(Percentage, Time, group=Algorithm, color = Algorithm))+
+  geom_line(aes(linetype=Algorithm)) +
+  ggtitle("Algorithms' Time Completion using Entropy Sampling") +
+  xlab("Percentage of Data Labelled") +
+  ylab("Time (sec)") +
+  scale_x_continuous(breaks = c(.1, .2, .3, .4, .5, .6)) +
+  theme_stata()
+
+RF_KNN <- rbind(RF_total, KNN_total)
+
+ggplot(RF_KNN, aes(Percentage, Time, group=Algorithm, color = Algorithm))+
+  geom_line(aes(linetype=Algorithm)) +
+  ggtitle("Random Forest and KNN's Time Completion") +
+  xlab("Percentage of Data Labelled") +
+  ylab("Time (sec)") +
+  scale_x_continuous(breaks = c(.1, .2, .3, .4, .5, .6)) +
+  theme_stata()
+```
+
+
+# RF
+# Cost is Money
+
+```{r}
+Unc_RF_Margin <- Unc_RF %>%
+  select(-Sampling, -Algorithm) %>%
+  group_by(iteration) %>%
+  summarize(Accuracy = mean(Accuracy), Percentage = mean(Percentage),
+            Time = mean(Time)) %>%
+  mutate(cost = .25)
+
+total_cost <- c()
+for(i in 1:nrow(Unc_RF_Margin)) {
+  total_cost <- c(total_cost, sum(Unc_RF_Margin$cost[0: i])+10)
+}
+Unc_RF_Margin[1, "cost"] <- 10
+Unc_RF_Margin[1, "total_cost"] <- 10
+
+
+margin_accuracy <- c()
+margin_accuracy <- c(margin_accuracy, 0)
+for(i in 2:nrow(Unc_RF_Margin)) {
+  margin_accuracy <- c(margin_accuracy, Unc_RF_Margin$Accuracy[i] - Unc_RF_Margin$Accuracy[i-1])
+}
+
+Unc_RF_Margin$total_cost <- total_cost
+Unc_RF_Margin$margin_accuracy <- margin_accuracy
+
+# THIS IS LIKE COMPARING APPLES AND
+utility <- c()
+utility <- c(utility, 0)
+for(i in 2:nrow(Unc_RF_Margin)) {
+  utility <- c(utility, Unc_RF_Margin$margin_accuracy[i] / Unc_RF_Margin$cost[i])
+}
+
+Unc_RF_Margin$utility <- utility
+```
+
+
+```{r}
+max_utility <- c()
+max_utility <- c(max_utility, 0)
+for(i in 2:100) {
+  max_utility <- c(max_utility, Unc_RF_Margin$utility[i] * Unc_RF_Margin$iteration[i])
+}
+
+library(glue)
+
+max_iteration <- which.max(max_utility)
+string = "Maximum Utility \n (Optimal Iteration = {max_iteration})"
+title = glue(string)
+
+Unc_RF_Margin %>%
+  ggplot(aes(iteration, utility)) +
+  geom_vline(xintercept = max_iteration, color = "red", size=1.5) +
+  geom_text(aes(x=max_iteration+50, label= title, y=.007)) +
+  geom_smooth() +
+  ylab("Utility") +
+  xlab("Data Sampling Iterations") +
+  ggtitle("Marginal Utility of Random Forest")+
+  theme_stata()
+
+optimal_iteration <- Unc_RF_Margin %>%
+  filter(iteration == max_iteration)
+optimal_iteration
+```
+
+
+
+
+
+
+
